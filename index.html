@@ -97,8 +97,8 @@ footer{text-align:center;margin-top:8px;color:var(--ink-soft);font-size:12px}
 // La clé "publishable/anon" est destinée au navigateur.
 // NE METTEZ JAMAIS une clé service_role/secret ici.
 // ============================================================
-const SUPABASE_URL = 'COLLEZ_ICI_URL_SUPABASE';
-const SUPABASE_KEY = 'COLLEZ_ICI_CLE_PUBLISHABLE_SUPABASE';
+const SUPABASE_URL = 'https://ferxlbwivyyfhnwgmcja.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_8hUQ_GkKsTl09DTe4bLH-Q_ZHEPHRXE';
 
 const BREAK_MS = 15 * 60 * 1000;
 const NAME_KEY = 'pauses_myname';
@@ -291,12 +291,14 @@ nameInput.addEventListener('change', ()=>{
 
 mainAction.addEventListener('click', handleMainAction);
 
-(async function init(){
-  if(SUPABASE_URL.includes('https://ferxlbwivyyfhnwgmcja.supabase.co') || SUPABASE_KEY.includes('sb_publishable_8hUQ_GkKsTl09DTe4bLH-Q_ZHEPHRXE')){
-    connectionStatus.textContent =
-      'Configuration Supabase manquante : renseignez les deux valeurs dans le code.';
-    connectionStatus.className = 'notice error';
-  }
+if(
+  SUPABASE_URL === 'https://ferxlbwivyyfhnwgmcja.supabase.co' ||
+  SUPABASE_KEY === 'sb_publishable_8hUQ_GkKsTl09DTe4bLH-Q_ZHEPHRXE'
+){
+  connectionStatus.textContent =
+    'Configuration Supabase manquante : renseignez les deux valeurs dans le code.';
+  connectionStatus.className = 'notice error';
+}
   myName = loadMyName();
   nameInput.value = myName;
   await poll();
