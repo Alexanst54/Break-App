@@ -1,3 +1,5 @@
+
+  
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -291,20 +293,12 @@ nameInput.addEventListener('change', ()=>{
 
 mainAction.addEventListener('click', handleMainAction);
 
-if(
-  SUPABASE_URL === 'https://ferxlbwivyyfhnwgmcja.supabase.co' ||
-  SUPABASE_KEY === 'sb_publishable_8hUQ_GkKsTl09DTe4bLH-Q_ZHEPHRXE'
-){
-  connectionStatus.textContent =
-    'Configuration Supabase manquante : renseignez les deux valeurs dans le code.';
-  connectionStatus.className = 'notice error';
-}
+(async function init(){
   myName = loadMyName();
   nameInput.value = myName;
+
   await poll();
+
   setInterval(poll, 10000);
   setInterval(render, 1000);
 })();
-</script>
-</body>
-</html>
