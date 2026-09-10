@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pause conseillers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F3F5F4;
+    --surface:#FFFFFF;
+    --surface-alt:#EAEFEC;
+    --ink:#1E2A28;
+    --ink-soft:#5B6B67;
+    --accent:#2F6F63;
+    --accent-soft:#DCEAE6;
+    --amber:#B8792E;
+    --amber-soft:#F6E7D3;
+    --danger:#A8453F;
+    --danger-soft:#F3DEDC;
+    --border:#DBE2DD;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    max-width:960px;
+    margin:0 auto;
+    padding:32px 20px 64px;
+    opacity:0;
+    animation:rise .5s ease-out forwards;
+  }
+  @keyframes rise{
+    from{opacity:0; transform:translateY(6px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .app{animation:none; opacity:1;}
+  }
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+    margin-bottom:28px;
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:500;
+    font-size:32px;
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+  }
+  .subtitle{
+    color:var(--ink-soft);
+    font-size:14px;
+    margin:0;
+  }
+  .capacity{
+    text-align:right;
+  }
+  .capacity-number{
+    font-family:'Fraunces',serif;
+    font-size:22px;
+    font-weight:500;
+  }
+  .capacity-label{
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .slots{
+    display:flex;
+    gap:5px;
+    margin-top:6px;
+    justify-content:flex-end;
+  }
+  .slot{
+    width:16px;
+    height:8px;
+    border-radius:2px;
+    background:var(--surface-alt);
+    border:1px solid var(--border);
+  }
+  .slot.filled{
+    background:var(--accent);
+    border-color:var(--accent);
+  }
+  .slot.filled.full{
+    background:var(--danger);
+    border-color:var(--danger);
+  }
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:22px 24px;
+    margin-bottom:20px;
+  }
+  .card h2{
+    font-family:'Fraunces',serif;
+    font-weight:500;
+    font-size:18px;
+    margin:0 0 14px;
+  }
+
+  .mon-espace-row{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  input[type=text]{
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:7px;
+    background:var(--bg);
+    color:var(--ink);
+    min-width:220px;
+  }
+  input[type=text]:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+  button{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    padding:10px 18px;
+    border-radius:7px;
+    border:none;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  button:disabled{
+    cursor:not-allowed;
+    opacity:.5;
+  }
+  .btn-primary{
+    background:var(--accent);
+    color:#fff;
+  }
+  .btn-primary:hover:not(:disabled){background:#265b51;}
+  .btn-secondary{
+    background:var(--surface-alt);
+    color:var(--ink);
+    border:1px solid var(--border);
+  }
+  .btn-secondary:hover:not(:disabled){background:#dfe6e1;}
+
+  .status-line{
+    margin-top:14px;
+    font-size:14px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .status-dot{
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:var(--ink-soft);
+    flex-shrink:0;
+  }
+  .status-dot.on-break{background:var(--accent);}
+  .status-dot.waiting{background:var(--amber);}
+  .timer{
+    font-variant-numeric:tabular-nums;
+    font-weight:700;
+  }
+
+  .columns{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+  }
+  @media (max-width:680px){
+    .columns{grid-template-columns:1fr;}
+    header{align-items:flex-start;}
+    .capacity{text-align:left;}
+    .slots{justify-content:flex-start;}
+  }
+
+  ul.person-list{
+    list-style:none;
+    margin:0;
+    padding:0;
+  }
+  ul.person-list li{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 0;
+    border-bottom:1px solid var(--border);
+    font-size:14px;
+  }
+  ul.person-list li:last-child{border-bottom:none;}
+  .person-name{font-weight:600;}
+  .person-meta{
+    color:var(--ink-soft);
+    font-size:13px;
+  }
+  .pill{
+    font-size:12px;
+    font-weight:700;
+    padding:2px 8px;
+    border-radius:20px;
+    font-variant-numeric:tabular-nums;
+  }
+  .pill.ok{background:var(--accent-soft); color:var(--accent);}
+  .pill.warn{background:var(--amber-soft); color:var(--amber);}
+  .pill.danger{background:var(--danger-soft); color:var(--danger);}
+  .queue-pos{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    background:var(--surface-alt);
+    border:1px solid var(--border);
+    font-size:12px;
+    font-weight:700;
+    margin-right:10px;
+    flex-shrink:0;
+  }
+  .empty-state{
+    color:var(--ink-soft);
+    font-size:14px;
+    padding:8px 0;
+  }
+  footer{
+    text-align:center;
+    margin-top:8px;
+  }
+  footer button{
+    background:none;
+    border:none;
+    color:var(--ink-soft);
+    font-size:12px;
+    font-weight:400;
+    text-decoration:underline;
+    padding:4px;
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <header>
+    <div>
+      <h1>Pause conseillers</h1>
+      <p class="subtitle">7 places disponibles en simultané &middot; 15 minutes par pause</p>
+    </div>
+    <div class="capacity">
+      <div class="capacity-number" id="capacityNumber">0 / 7</div>
+      <div class="capacity-label">conseillers en pause</div>
+      <div class="slots" id="slots"></div>
+    </div>
+  </header>
+
+  <div class="card">
+    <h2>Mon espace</h2>
+    <div class="mon-espace-row">
+      <input type="text" id="nameInput" placeholder="Votre prénom" maxlength="30">
+      <button class="btn-primary" id="mainAction">Demander une pause</button>
+    </div>
+    <div class="status-line" id="statusLine"></div>
+  </div>
+
+  <div class="columns">
+    <div class="card">
+      <h2>En pause</h2>
+      <ul class="person-list" id="breakList"></ul>
+    </div>
+    <div class="card">
+      <h2>File d'attente</h2>
+      <ul class="person-list" id="queueList"></ul>
+    </div>
+  </div>
+
+  <footer>
+    <button id="resetBtn">Réinitialiser le suivi</button>
+  </footer>
+
+</div>
+
+<script>
+// --- À CONFIGURER : collez ici les deux URLs générées par vos flux Power Automate ---
+const GET_URL = 'COLLEZ_ICI_URL_DU_FLUX_GET';
+const SET_URL = 'COLLEZ_ICI_URL_DU_FLUX_POST';
+// -----------------------------------------------------------------------------------
+
+const NAME_KEY = 'pauses_myname';
+const BREAK_MS = 15 * 60 * 1000;
+
+let state = { activeBreaks: [], queue: [] };
+let myName = '';
+
+const nameInput = document.getElementById('nameInput');
+const mainAction = document.getElementById('mainAction');
+const statusLine = document.getElementById('statusLine');
+const breakList = document.getElementById('breakList');
+const queueList = document.getElementById('queueList');
+const capacityNumber = document.getElementById('capacityNumber');
+const slotsEl = document.getElementById('slots');
+const resetBtn = document.getElementById('resetBtn');
+
+function fmt(ms){
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+async function fetchState(){
+  try{
+    const res = await fetch(GET_URL);
+    if(!res.ok) throw new Error('Réponse HTTP ' + res.status);
+    const parsed = await res.json();
+    return {
+      activeBreaks: Array.isArray(parsed.activeBreaks) ? parsed.activeBreaks : [],
+      queue: Array.isArray(parsed.queue) ? parsed.queue : []
+    };
+  } catch(e){
+    console.error('Erreur de lecture', e);
+    return { activeBreaks: [], queue: [] };
+  }
+}
+
+async function saveState(s){
+  try{
+    await fetch(SET_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(s)
+    });
+  } catch(e){
+    console.error('Erreur de sauvegarde', e);
+  }
+}
+
+// Le prénom reste stocké localement dans le navigateur de chaque poste — pas besoin de backend pour ça.
+function loadMyName(){
+  try{
+    return localStorage.getItem(NAME_KEY) || '';
+  } catch(e){
+    return '';
+  }
+}
+
+function saveMyName(n){
+  try{
+    localStorage.setItem(NAME_KEY, n);
+  } catch(e){}
+}
+
+// Removes anyone over 15min, then promotes from the queue into freed slots.
+// Returns true if anything changed (so we know to persist).
+function reconcile(s){
+  const now = Date.now();
+  let changed = false;
+
+  const kept = [];
+  for(const b of s.activeBreaks){
+    if(now - b.startTime >= BREAK_MS){
+      changed = true;
+    } else {
+      kept.push(b);
+    }
+  }
+  s.activeBreaks = kept;
+
+  while(s.activeBreaks.length < 7 && s.queue.length > 0){
+    const next = s.queue.shift();
+    s.activeBreaks.push({ name: next.name, startTime: now });
+    changed = true;
+  }
+
+  return changed;
+}
+
+function render(){
+  const now = Date.now();
+
+  capacityNumber.textContent = state.activeBreaks.length + ' / 7';
+  slotsEl.innerHTML = '';
+  for(let i = 0; i < 7; i++){
+    const d = document.createElement('div');
+    d.className = 'slot' + (i < state.activeBreaks.length ? ' filled' : '') + (state.activeBreaks.length >= 7 ? ' full' : '');
+    slotsEl.appendChild(d);
+  }
+
+  // Break list
+  breakList.innerHTML = '';
+  if(state.activeBreaks.length === 0){
+    breakList.innerHTML = '<li class="empty-state">Personne en pause pour le moment.</li>';
+  } else {
+    const sorted = [...state.activeBreaks].sort((a,b) => a.startTime - b.startTime);
+    for(const b of sorted){
+      const remaining = BREAK_MS - (now - b.startTime);
+      let pillClass = 'ok';
+      if(remaining <= 30000) pillClass = 'danger';
+      else if(remaining <= 120000) pillClass = 'warn';
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="person-name">${escapeHtml(b.name)}</span>
+        <span class="pill ${pillClass}">${fmt(remaining)}</span>`;
+      breakList.appendChild(li);
+    }
+  }
+
+  // Queue list
+  queueList.innerHTML = '';
+  if(state.queue.length === 0){
+    queueList.innerHTML = '<li class="empty-state">Aucune demande en attente.</li>';
+  } else {
+    state.queue.forEach((q, i) => {
+      const waitedMin = Math.floor((now - q.requestTime) / 60000);
+      const li = document.createElement('li');
+      li.innerHTML = `<span style="display:flex;align-items:center;">
+          <span class="queue-pos">${i + 1}</span>
+          <span class="person-name">${escapeHtml(q.name)}</span>
+        </span>
+        <span class="person-meta">en attente depuis ${waitedMin} min</span>`;
+      queueList.appendChild(li);
+    });
+  }
+
+  // My status / action button
+  const myBreak = state.activeBreaks.find(b => b.name === myName);
+  const myQueue = state.queue.find(q => q.name === myName);
+
+  if(!myName){
+    mainAction.textContent = 'Demander une pause';
+    mainAction.className = 'btn-primary';
+    mainAction.disabled = true;
+    statusLine.innerHTML = '';
+  } else if(myBreak){
+    const remaining = BREAK_MS - (now - myBreak.startTime);
+    mainAction.textContent = 'Je suis de retour';
+    mainAction.className = 'btn-primary';
+    mainAction.disabled = false;
+    statusLine.innerHTML = `<span class="status-dot on-break"></span>
+      Vous êtes en pause &middot; <span class="timer">${fmt(remaining)}</span> restantes avant retour automatique`;
+  } else if(myQueue){
+    const pos = state.queue.findIndex(q => q.name === myName) + 1;
+    mainAction.textContent = 'Annuler ma demande';
+    mainAction.className = 'btn-secondary';
+    mainAction.disabled = false;
+    statusLine.innerHTML = `<span class="status-dot waiting"></span>
+      En file d'attente &middot; position ${pos}`;
+  } else {
+    mainAction.textContent = 'Demander une pause';
+    mainAction.className = 'btn-primary';
+    mainAction.disabled = false;
+    statusLine.innerHTML = `<span class="status-dot"></span> Pas de pause en cours`;
+  }
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+async function poll(){
+  state = await fetchState();
+  const changed = reconcile(state);
+  if(changed){
+    await saveState(state);
+  }
+  render();
+}
+
+async function handleMainAction(){
+  if(!myName) return;
+  mainAction.disabled = true;
+  state = await fetchState();
+  reconcile(state);
+
+  const inBreak = state.activeBreaks.some(b => b.name === myName);
+  const inQueue = state.queue.some(q => q.name === myName);
+
+  if(inBreak){
+    // Validate return
+    state.activeBreaks = state.activeBreaks.filter(b => b.name !== myName);
+    reconcile(state);
+  } else if(inQueue){
+    // Cancel request
+    state.queue = state.queue.filter(q => q.name !== myName);
+  } else {
+    // New request
+    if(state.activeBreaks.length < 7){
+      state.activeBreaks.push({ name: myName, startTime: Date.now() });
+    } else {
+      state.queue.push({ name: myName, requestTime: Date.now() });
+    }
+  }
+
+  await saveState(state);
+  render();
+}
+
+nameInput.addEventListener('change', async () => {
+  myName = nameInput.value.trim();
+  await saveMyName(myName);
+  render();
+});
+
+mainAction.addEventListener('click', handleMainAction);
+
+resetBtn.addEventListener('click', async () => {
+  if(!confirm("Réinitialiser toutes les pauses et la file d'attente pour tout le monde ?")) return;
+  state = { activeBreaks: [], queue: [] };
+  await saveState(state);
+  render();
+});
+
+(async function init(){
+  myName = await loadMyName();
+  nameInput.value = myName;
+  await poll();
+  setInterval(poll, 15000); // toutes les 15s pour ménager le quota de flux Power Automate
+  setInterval(render, 1000);
+})();
+</script>
+</body>
+</html>
