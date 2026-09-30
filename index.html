@@ -4,18 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pause conseillers</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
 <style>
 body{font-family:Arial,sans-serif;max-width:1000px;margin:auto;padding:25px;background:#f4f6f5;color:#202a28}
 .card{background:white;border:1px solid #d9dfdc;border-radius:10px;padding:20px;margin:15px 0}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 input{padding:10px;border:1px solid #ccd5d1;border-radius:6px}
 button{padding:10px 15px;border:0;border-radius:6px;cursor:pointer;font-weight:bold}
+button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:3px solid #2f6f63;outline-offset:2px}
 .primary{background:#2f6f63;color:white}.secondary{background:#e8eeeb}.danger{background:#a8453f;color:white}
 .columns{display:grid;grid-template-columns:1fr 1fr;gap:15px}
-li{list-style:none;padding:10px 0;border-bottom:1px solid #ddd;display:flex;justify-content:space-between}
-ul{padding:0}.muted{color:#68736f;font-size:13px}.success{color:#2f6f63}.error{color:#a8453f}
-#admin{display:none}
+li{list-style:none;padding:10px 0;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;gap:10px}
+ul{padding:0}.muted{color:#58635f;font-size:13px}.success{color:#2f6f63;font-weight:bold}.error{color:#a8453f}.late{color:#a8453f;font-weight:bold}
+#alert{font-weight:bold;color:#2f6f63}#admin{display:none}
 @media(max-width:700px){.columns{grid-template-columns:1fr}}
 </style>
 </head>
@@ -26,10 +28,14 @@ ul{padding:0}.muted{color:#68736f;font-size:13px}.success{color:#2f6f63}.error{c
 <div class="card">
 <h2>Mon espace</h2>
 <div class="row">
+<label for="name" class="muted">Prénom</label>
 <input id="name" maxlength="30" placeholder="Votre prénom">
 <button class="primary" id="action">Demander une pause</button>
+<button class="secondary" id="decline" style="display:none">Passer mon tour</button>
 </div>
-<p id="status"></p>
+<p id="status" aria-live="polite"></p>
+<p id="alert" role="alert"></p>
+<p id="error" class="error" role="alert"></p>
 <p id="connection" class="muted"></p>
 <button class="secondary" id="openAdmin">Administration</button>
 </div>
@@ -44,14 +50,13 @@ ul{padding:0}.muted{color:#68736f;font-size:13px}.success{color:#2f6f63}.error{c
 <h2>Administration</h2>
 <p class="muted">Connexion avec le compte créé dans Supabase Authentication.</p>
 <div class="row">
-<input type="email" id="email" placeholder="Email">
-<input type="password" id="password" placeholder="Mot de passe">
+<input type="email" id="email" placeholder="Email" aria-label="Email">
+<input type="password" id="password" placeholder="Mot de passe" aria-label="Mot de passe">
 <button class="primary" id="login">Se connecter</button>
 <button class="secondary" id="closeAdmin">Fermer</button>
 </div>
-<p id="loginStatus"></p>
+<p id="loginStatus" class="error"></p>
 </div>
-
 <div id="dashboard" style="display:none">
 <div class="card">
 <h2>Paramètres</h2>
@@ -61,14 +66,12 @@ ul{padding:0}.muted{color:#68736f;font-size:13px}.success{color:#2f6f63}.error{c
 <button class="primary" id="save">Enregistrer</button>
 <button class="secondary" id="logout">Déconnexion</button>
 </div>
-<p id="settingsStatus"></p>
+<p id="settingsStatus" aria-live="polite"></p>
 </div>
-
 <div class="columns">
 <div class="card"><h2>Pauses</h2><ul id="adminBreaks"></ul></div>
 <div class="card"><h2>File</h2><ul id="adminQueue"></ul></div>
 </div>
-
 <div class="card">
 <button class="danger" id="clearQueue">Vider la file</button>
 <button class="danger" id="reset">Réinitialiser tout</button>
@@ -80,64 +83,107 @@ ul{padding:0}.muted{color:#68736f;font-size:13px}.success{color:#2f6f63}.error{c
 const SUPABASE_URL='https://ferxlbwivyyfhnwgmcja.supabase.co';
 const SUPABASE_KEY='sb_publishable_8hUQ_GkKsTl09DTe4bLH-Q_ZHEPHRXE';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let state={activeBreaks:[],queue:[],settings:{maxBreaks:7,breakMinutes:15}};
-let name=localStorage.getItem('pause_name')||'',admin=false;
 const $=id=>document.getElementById(id);
+let state={activeBreaks:[],queue:[],settings:{maxBreaks:7,breakMinutes:15,offerSeconds:60}};
+let name=localStorage.getItem('pause_name')||'',admin=false,offset=0,prev='',warned=false;
+// Jeton propre à ce navigateur : seul lui peut annuler/valider sa pause.
+let token=localStorage.getItem('pause_token');
+if(!token){token=crypto.randomUUID();localStorage.setItem('pause_token',token)}
 $('name').value=name;
 
-function esc(v){const d=document.createElement('div');d.textContent=v||'';return d.innerHTML}
-function norm(x){return {activeBreaks:x?.activeBreaks||[],queue:x?.queue||[],settings:{maxBreaks:+(x?.settings?.maxBreaks||7),breakMinutes:+(x?.settings?.breakMinutes||15)}}}
-function timeLeft(start){return Math.max(0,state.settings.breakMinutes*60000-(Date.now()-new Date(start).getTime()))}
-function fmt(ms){let s=Math.floor(ms/1000),m=Math.floor(s/60);return m+':'+String(s%60).padStart(2,'0')}
+// Construction DOM (jamais de HTML concaténé : pas d'injection possible)
+function el(tag,attrs={},...kids){const e=document.createElement(tag);
+ for(const k in attrs){if(k==='class')e.className=attrs[k];else if(k.startsWith('data-'))e.setAttribute(k,attrs[k]);else e[k]=attrs[k]}
+ e.append(...kids);return e}
+function fill(ul,list,fn,empty){ul.replaceChildren();if(!list.length)ul.append(el('li',{class:'muted'},empty));list.forEach((x,i)=>ul.append(fn(x,i)))}
+const same=x=>x.name.toLowerCase()===name.toLowerCase();
+const nowMs=()=>Date.now()+offset;
+const left=s=>Math.max(0,state.settings.breakMinutes*60000-(nowMs()-Date.parse(s)));
+const offerLeft=s=>Math.max(0,state.settings.offerSeconds*1000-(nowMs()-Date.parse(s)));
+const fmt=ms=>{const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+function norm(x){const s=x?.settings||{};return{activeBreaks:x?.activeBreaks||[],queue:x?.queue||[],
+ settings:{maxBreaks:+(s.maxBreaks||7),breakMinutes:+(s.breakMinutes||15),offerSeconds:+(s.offerSeconds||60)}}}
+function applyState(x){if(x?.serverNow)offset=Date.parse(x.serverNow)-Date.now();state=norm(x);tick()}
 
-async function getState(){let r=await db.rpc('get_pause_state');if(r.error)throw r.error;return norm(r.data)}
+function alertMe(msg){
+ try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator();o.connect(c.destination);o.frequency.value=880;o.start();o.stop(c.currentTime+.4)}catch(e){}
+ try{if(window.Notification&&Notification.permission==='granted')new Notification('Pause conseillers',{body:msg})}catch(e){}
+ document.title='🔔 '+msg;setTimeout(()=>document.title='Pause conseillers',8000);$('alert').textContent=msg}
+function notify(){
+ const b=state.activeBreaks.find(same),q=state.queue.find(same),s=b?'break':q&&q.offeredAt?'offer':q?'queue':'none';
+ if(s==='offer'&&prev!=='offer')alertMe('Une place de pause est libre pour vous : validez !');
+ if(prev==='break'&&s==='none')alertMe('Votre pause est terminée.');
+ if(b&&left(b.startTime)<=120000&&!warned){warned=true;alertMe('Il reste moins de 2 minutes de pause.')}
+ if(!b)warned=false;
+ if(s!=='offer'&&s!=='break'&&s!==prev)$('alert').textContent='';
+ prev=s}
+
 function render(){
-$('count').textContent=state.activeBreaks.length;
-$('subtitle').textContent=state.settings.maxBreaks+' places simultanées · '+state.settings.breakMinutes+' min';
-$('breaks').innerHTML=state.activeBreaks.length?'':'<li class="muted">Personne en pause.</li>';
-state.activeBreaks.forEach(x=>$('breaks').insertAdjacentHTML('beforeend','<li><b>'+esc(x.name)+'</b><span>'+fmt(timeLeft(x.startTime))+'</span></li>'));
-$('queue').innerHTML=state.queue.length?'':'<li class="muted">Aucune demande.</li>';
-state.queue.forEach((x,i)=>$('queue').insertAdjacentHTML('beforeend','<li><span><b>'+(i+1)+'.</b> '+esc(x.name)+'</span></li>'));
-let b=state.activeBreaks.some(x=>x.name.toLowerCase()===name.toLowerCase()),q=state.queue.some(x=>x.name.toLowerCase()===name.toLowerCase());
-$('action').disabled=!name;
-$('action').textContent=b?'Je suis de retour':q?'Annuler ma demande':'Demander une pause';
-$('status').textContent=b?'Vous êtes en pause · '+fmt(timeLeft(state.activeBreaks.find(x=>x.name.toLowerCase()===name.toLowerCase()).startTime))+' restantes':q?'Vous êtes dans la file.':'';
-}
-async function refresh(){
-try{state=await getState();$('connection').textContent='Connecté · '+new Date().toLocaleTimeString('fr-FR');$('connection').className='success';render();if(admin)adminRefresh()}catch(e){$('connection').textContent='Erreur Supabase : '+(e?.message||String(e));$('connection').className='error';console.error('Supabase get_pause_state error:',e)}
-}
-$('name').oninput=()=>{name=$('name').value.trim().replace(/\s+/g,' ');localStorage.setItem('pause_name',name);render()};
-$('action').onclick=async()=>{try{
-let b=state.activeBreaks.some(x=>x.name.toLowerCase()===name.toLowerCase()),q=state.queue.some(x=>x.name.toLowerCase()===name.toLowerCase());
-let r=await db.rpc(b||q?'cancel_or_return':'request_pause',{p_name:name});if(r.error)throw r.error;state=norm(r.data);render();
-}catch(e){alert(e.message)}};
+ const S=state.settings,b=state.activeBreaks.find(same),q=state.queue.find(same),o=q&&q.offeredAt;
+ $('count').textContent=state.activeBreaks.length;
+ $('subtitle').textContent=S.maxBreaks+' places simultanées · '+S.breakMinutes+' min';
+ fill($('breaks'),state.activeBreaks,x=>{const l=left(x.startTime);return el('li',{},el('b',{},x.name),el('span',{class:l<180000?'late':''},fmt(l)))},'Personne en pause.');
+ fill($('queue'),state.queue,(x,i)=>el('li',{},el('span',{},el('b',{},(i+1)+'. '),x.name),
+  x.offeredAt?el('span',{class:'success'},'place proposée · '+fmt(offerLeft(x.offeredAt))):''),'Aucune demande.');
+ $('action').disabled=!name;
+ $('action').textContent=b?'Je suis de retour':o?'Je pars en pause':q?'Annuler ma demande':'Demander une pause';
+ $('decline').style.display=o?'':'none';
+ $('status').textContent=b?'Vous êtes en pause · '+fmt(left(b.startTime))+' restantes':
+  o?'Une place est libre pour vous, validez avant '+fmt(offerLeft(q.offeredAt)):
+  q?'Vous êtes dans la file (position '+(state.queue.indexOf(q)+1)+').':''}
+function tick(){render();notify()}
 
+async function call(fn){
+ try{$('error').textContent='';
+  if(window.Notification&&Notification.permission==='default')Notification.requestPermission();
+  const r=await db.rpc(fn,{p_name:name,p_token:token});if(r.error)throw r.error;applyState(r.data)
+ }catch(e){$('error').textContent=e.message||String(e)}}
+$('name').oninput=()=>{name=$('name').value.trim().replace(/\s+/g,' ');localStorage.setItem('pause_name',name);tick()};
+$('action').onclick=()=>{const b=state.activeBreaks.find(same),q=state.queue.find(same);
+ call(b?'cancel_or_return':q&&q.offeredAt?'accept_offer':q?'cancel_or_return':'request_pause')};
+$('decline').onclick=()=>call('cancel_or_return');
+
+async function refresh(){
+ try{const r=await db.rpc('get_pause_state');if(r.error)throw r.error;applyState(r.data);
+  $('connection').textContent='Connecté · '+new Date().toLocaleTimeString('fr-FR');$('connection').className='muted';
+  if(admin)adminRefresh()
+ }catch(e){$('connection').textContent='Connexion perdue : données peut-être périmées ('+(e?.message||e)+')';$('connection').className='error'}}
+
+// Administration
+function showAdmin(on){admin=on;$('loginCard').style.display=on?'none':'block';$('dashboard').style.display=on?'block':'none';if(on)adminRefresh()}
 $('openAdmin').onclick=()=>{$('admin').style.display='block';$('admin').scrollIntoView({behavior:'smooth'})};
 $('closeAdmin').onclick=()=>{$('admin').style.display='none'};
-
-async function login(){
-try{let r=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(r.error)throw r.error;
-let a=await db.rpc('is_admin');if(a.error)throw a.error;if(!a.data){await db.auth.signOut();throw Error('Ce compte n’est pas administrateur.')}
-admin=true;$('loginCard').style.display='none';$('dashboard').style.display='block';await adminRefresh()
-}catch(e){$('loginStatus').textContent=e.message;$('loginStatus').className='error'}
-}
-$('login').onclick=login;
-$('logout').onclick=async()=>{await db.auth.signOut();admin=false;$('dashboard').style.display='none';$('loginCard').style.display='block'};
-
+$('login').onclick=async()=>{try{
+ const r=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(r.error)throw r.error;
+ const a=await db.rpc('is_admin');if(a.error)throw a.error;
+ if(!a.data){await db.auth.signOut();throw Error('Ce compte n’est pas administrateur.')}
+ $('loginStatus').textContent='';showAdmin(true)
+}catch(e){$('loginStatus').textContent=e.message}};
+$('logout').onclick=async()=>{await db.auth.signOut();showAdmin(false)};
+async function admCall(fn,args={}){const r=await db.rpc(fn,args);
+ if(r.error){$('settingsStatus').textContent=r.error.message;$('settingsStatus').className='error';return false}
+ $('settingsStatus').textContent='';applyState(r.data);adminRefresh();return true}
 async function adminRefresh(){
-let r=await db.rpc('admin_get_state');if(r.error)return;
-let s=norm(r.data);$('max').value=s.settings.maxBreaks;$('minutes').value=s.settings.breakMinutes;
-$('adminBreaks').innerHTML=s.activeBreaks.length?'':'<li class="muted">Personne en pause.</li>';
-s.activeBreaks.forEach(x=>$('adminBreaks').insertAdjacentHTML('beforeend','<li><b>'+esc(x.name)+'</b><button class="danger" onclick="removePerson('+JSON.stringify(x.name)+',\'break\')">Retour</button></li>'));
-$('adminQueue').innerHTML=s.queue.length?'':'<li class="muted">Aucune demande.</li>';
-s.queue.forEach(x=>$('adminQueue').insertAdjacentHTML('beforeend','<li><b>'+esc(x.name)+'</b><button class="danger" onclick="removePerson('+JSON.stringify(x.name)+',\'queue\')">Supprimer</button></li>'));
-}
-window.removePerson=async(n,m)=>{if(!confirm('Confirmer ?'))return;let r=await db.rpc('admin_remove_person',{p_name:n,p_mode:m});if(r.error)alert(r.error.message);else{state=norm(r.data);render();adminRefresh()}};
-$('save').onclick=async()=>{let r=await db.rpc('admin_update_settings',{p_max_breaks:+$('max').value,p_break_minutes:+$('minutes').value});if(r.error)alert(r.error.message);else{state=norm(r.data);render();adminRefresh();$('settingsStatus').textContent='Paramètres enregistrés.'}};
-$('clearQueue').onclick=async()=>{if(!confirm('Vider la file ?'))return;let r=await db.rpc('admin_clear_queue');if(r.error)alert(r.error.message);else{state=norm(r.data);render();adminRefresh()}};
-$('reset').onclick=async()=>{if(!confirm('Réinitialiser toutes les pauses et demandes ?'))return;let r=await db.rpc('admin_reset_all');if(r.error)alert(r.error.message);else{state=norm(r.data);render();adminRefresh()}};
+ const r=await db.rpc('admin_get_state');
+ if(r.error){$('settingsStatus').textContent=r.error.message;$('settingsStatus').className='error';return}
+ const s=norm(r.data);
+ if(document.activeElement!==$('max'))$('max').value=s.settings.maxBreaks;
+ if(document.activeElement!==$('minutes'))$('minutes').value=s.settings.breakMinutes;
+ const row=(x,mode,label)=>el('li',{},el('b',{},x.name),el('button',{class:'secondary','data-rm':mode,'data-name':x.name},label));
+ fill($('adminBreaks'),s.activeBreaks,x=>row(x,'break','Retour'),'Personne en pause.');
+ fill($('adminQueue'),s.queue,x=>row(x,'queue','Retirer'),'Aucune demande.')}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-rm]');
+ if(b&&confirm('Confirmer pour '+b.dataset.name+' ?'))admCall('admin_remove_person',{p_name:b.dataset.name,p_mode:b.dataset.rm})});
+$('save').onclick=async()=>{if(await admCall('admin_update_settings',{p_max_breaks:+$('max').value,p_break_minutes:+$('minutes').value})){
+ $('settingsStatus').textContent='Paramètres enregistrés.';$('settingsStatus').className='success'}};
+$('clearQueue').onclick=()=>{if(confirm('Vider la file ?'))admCall('admin_clear_queue')};
+$('reset').onclick=()=>{if(confirm('Réinitialiser toutes les pauses et demandes ?'))admCall('admin_reset_all')};
 
-(async()=>{await refresh();setInterval(refresh,10000);setInterval(render,1000)})();
+(async()=>{
+ await refresh();setInterval(refresh,10000);setInterval(tick,1000);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
+ try{const s=await db.auth.getSession();if(s.data.session){const a=await db.rpc('is_admin');if(a.data){$('admin').style.display='block';showAdmin(true)}}}catch(e){}
+})();
 </script>
 </body>
 </html>
