@@ -9,6 +9,7 @@ async function fixture() {
  const db=new PGlite();
  await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key,email text); create function auth.uid() returns uuid language sql as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`);
  await db.exec(sql);
+ await db.exec(await readFile('supabase/migrations/20261007080715_optimize_state_probe.sql','utf8'));
  const team=(await db.query('select id from break_app.teams')).rows[0].id;
  for(let i=0;i<4;i++) {
   await db.query('insert into auth.users values($1,$2)',[ids[i],`test${i}@example.test`]);
@@ -78,6 +79,30 @@ test('expiration conservée, antispam, désactivation et cloisonnement équipes'
   await rpc(0,'ba_save_member',['test1@example.test','  Test    Un  ',team,'advisor',false]);
   await assert.rejects(rpc(1,'ba_state'),/Compte non autorisé/);
   assert.equal((await db.query('select display_name from break_app.members where user_id=$1',[ids[1]])).rows[0].display_name,'Test Un');
+ }finally{await db.close();}
+});
+test('poll conditionnel : cache complet, autorisation et volume transféré',async()=>{
+ const {db,team,rpc}=await fixture();
+ try{
+  const first=await rpc(1,'ba_poll',[null,null]);
+  const cached=await rpc(1,'ba_poll',[null,first.version]);
+  assert.equal(cached.unchanged,true);assert.equal(cached.state,undefined);
+  const bytes=x=>Buffer.byteLength(JSON.stringify(x));
+  console.log('Mesure JSON : état='+bytes(first.state)+' octets, inchangé='+bytes(cached)+' octets');
+  assert.ok(bytes(cached)<bytes(first.state)*0.3);
+  await db.query("update break_app.members set display_name='Nom modifié' where user_id=$1",[ids[1]]);
+  const renamed=await rpc(1,'ba_poll',[null,first.version]);
+  assert.equal(renamed.state.member.display_name,'Nom modifié');
+  await rpc(1,'ba_act',['request',null]);
+  const changed=await rpc(1,'ba_poll',[null,renamed.version]);
+  assert.equal(changed.state.myLatest.status,'offered');
+  await rpc(1,'ba_act',['cancel',changed.state.myLatest.id]);
+  assert.equal((await rpc(1,'ba_poll',[null,changed.version])).state.myLatest.status,'cancelled');
+  await db.query('update break_app.members set enabled=false where user_id=$1',[ids[1]]);
+  await assert.rejects(rpc(1,'ba_poll',[null,changed.version]),/Compte non autorisé/);
+  await db.exec('set role anon');
+  await assert.rejects(db.query('select public.ba_poll()'),/permission denied/);
+  await db.exec('reset role');
  }finally{await db.close();}
 });
 test('migration refuse la base de production V1',async()=>{

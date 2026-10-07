@@ -14,6 +14,7 @@ async function harness(authenticated=false){
  const session={access_token:'test',user:{email:'test@example.test'}};const calls=[];let hold=null;
  const client={auth:{onAuthStateChange(){},async getSession(){return{data:{session:authenticated?session:null}};},async signInWithPassword(){return{data:{session}};},async signOut(){return{};}},rpc(name,args){calls.push([name,args]);return{async abortSignal(){if(hold)await hold;
   if(name==='ba_members')return{data:[]};
+  if(name==='ba_poll')return{data:args.p_version==='v1'?{serverNow:new Date().toISOString(),version:'v1',unchanged:true}:{state:structuredClone(state),version:'v1'}};
   if(name==='ba_act'){const status=args.p_action==='request'?'offered':args.p_action==='accept'?'active':'completed';state.myLatest={id:1,status,offer_expires_at:new Date(Date.now()+60000).toISOString(),due_at:new Date(Date.now()+900000).toISOString()};state.requests=status==='completed'?[]:[{id:1,name:'Pilote test',mine:true,status,requestedAt:new Date().toISOString(),offerExpiresAt:state.myLatest.offer_expires_at,dueAt:state.myLatest.due_at}];}
   return{data:structuredClone(state)};
  }}}};
@@ -34,7 +35,7 @@ test('interface : connexion, demande, départ, retour et blocage des doubles cli
 });
 test('interface : saisies pilotage préservées pendant un rafraîchissement',async()=>{
  const h=await harness(true),d=h.w.document;try{
-  d.getElementById('adminTab').click();await wait();assert.equal(d.getElementById('adminView').hidden,false);
+  await new Promise(r=>setTimeout(r,100));d.getElementById('adminTab').click();await new Promise(r=>setTimeout(r,100));assert.equal(d.getElementById('adminView').hidden,false);
   const field=d.getElementById('settingsForm').elements.max_breaks;field.value='5';field.dispatchEvent(new h.w.Event('input',{bubbles:true}));
   d.getElementById('refresh').click();await wait();assert.equal(field.value,'5');assert.equal(d.getElementById('dirtyLabel').hidden,false);
   d.getElementById('discardSettings').click();assert.equal(field.value,'1');
