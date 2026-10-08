@@ -1,189 +1,38 @@
 <!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pause conseillers</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
-<style>
-body{font-family:Arial,sans-serif;max-width:1000px;margin:auto;padding:25px;background:#f4f6f5;color:#202a28}
-.card{background:white;border:1px solid #d9dfdc;border-radius:10px;padding:20px;margin:15px 0}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-input{padding:10px;border:1px solid #ccd5d1;border-radius:6px}
-button{padding:10px 15px;border:0;border-radius:6px;cursor:pointer;font-weight:bold}
-button:disabled{opacity:.5;cursor:default}
-:focus-visible{outline:3px solid #2f6f63;outline-offset:2px}
-.primary{background:#2f6f63;color:white}.secondary{background:#e8eeeb}.danger{background:#a8453f;color:white}
-.columns{display:grid;grid-template-columns:1fr 1fr;gap:15px}
-li{list-style:none;padding:10px 0;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;gap:10px}
-ul{padding:0}.muted{color:#58635f;font-size:13px}.success{color:#2f6f63;font-weight:bold}.error{color:#a8453f}.late{color:#a8453f;font-weight:bold}
-#alert{font-weight:bold;color:#2f6f63}#admin{display:none}
-@media(max-width:700px){.columns{grid-template-columns:1fr}}
-</style>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#174f46"><meta name="description" content="Break App : demandes de pauses et pilotage des équipes."><title>Break App</title>  <script type="module" crossorigin src="./assets/index-6NSLBinD.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-3eC8inPJ.css">
 </head>
 <body>
-<h1>Pause conseillers</h1>
-<p class="muted" id="subtitle">Connexion…</p>
-
-<div class="card">
-<h2>Mon espace</h2>
-<div class="row">
-<label for="name" class="muted">Prénom</label>
-<input id="name" maxlength="30" placeholder="Votre prénom">
-<button class="primary" id="action">Demander une pause</button>
-<button class="secondary" id="decline" style="display:none">Passer mon tour</button>
-</div>
-<p id="status" aria-live="polite"></p>
-<p id="alert" role="alert"></p>
-<p id="error" class="error" role="alert"></p>
-<p id="connection" class="muted"></p>
-<button class="secondary" id="openAdmin">Administration</button>
-</div>
-
-<div class="columns">
-<div class="card"><h2>En pause (<span id="count">0</span>)</h2><ul id="breaks"></ul></div>
-<div class="card"><h2>File d'attente</h2><ul id="queue"></ul></div>
-</div>
-
-<section id="admin">
-<div class="card" id="loginCard">
-<h2>Administration</h2>
-<p class="muted">Connexion avec le compte créé dans Supabase Authentication.</p>
-<div class="row">
-<input type="email" id="email" placeholder="Email" aria-label="Email">
-<input type="password" id="password" placeholder="Mot de passe" aria-label="Mot de passe">
-<button class="primary" id="login">Se connecter</button>
-<button class="secondary" id="closeAdmin">Fermer</button>
-</div>
-<p id="loginStatus" class="error"></p>
-</div>
-<div id="dashboard" style="display:none">
-<div class="card">
-<h2>Paramètres</h2>
-<div class="row">
-<label>Places : <input type="number" id="max" min="1" max="100"></label>
-<label>Durée (min) : <input type="number" id="minutes" min="1" max="180"></label>
-<button class="primary" id="save">Enregistrer</button>
-<button class="secondary" id="logout">Déconnexion</button>
-</div>
-<p id="settingsStatus" aria-live="polite"></p>
-</div>
-<div class="columns">
-<div class="card"><h2>Pauses</h2><ul id="adminBreaks"></ul></div>
-<div class="card"><h2>File</h2><ul id="adminQueue"></ul></div>
-</div>
-<div class="card">
-<button class="danger" id="clearQueue">Vider la file</button>
-<button class="danger" id="reset">Réinitialiser tout</button>
-</div>
-</div>
+<div class="environment">ESPACE PAUSES <span>Connexion individuelle · accès autorisé par le pilotage</span></div>
+<header class="shell"><a class="brand" href="./" aria-label="Break App accueil"><span class="logo">B</span><span>Break App<small>Le bon moment pour souffler.</small></span></a><div id="identity" hidden><span id="who"></span><button id="logout" class="quiet">Déconnexion</button></div></header>
+<main class="shell">
+<div id="boot" class="notice" role="status">Chargement de l’application…</div>
+<noscript><p class="notice error">Activez JavaScript pour utiliser Break App.</p></noscript>
+<div id="message" class="notice" role="status" aria-live="polite" hidden></div>
+<div id="error" class="notice error" role="alert" hidden></div>
+<section id="auth" class="login-layout" hidden>
+ <div class="intro"><span class="eyebrow">ESPACE CONSEILLERS</span><h1>Une pause,<br>l’esprit tranquille.</h1><p>Demandez votre place, suivez votre tour et confirmez votre retour. Le pilotage garde une vue commune.</p><div class="steps"><span>01 <b>Demander</b></span><span>02 <b>Confirmer</b></span><span>03 <b>Revenir</b></span></div></div>
+ <form id="loginForm" class="card"><span class="eyebrow">ACCÈS SÉCURISÉ</span><h2>Se connecter</h2><p class="muted">Utilisez votre compte autorisé par le pilotage.</p><label for="email">Adresse e-mail</label><input id="email" name="email" type="email" autocomplete="username" required><label for="password">Mot de passe</label><input id="password" name="password" type="password" autocomplete="current-password" required><button class="primary" id="login">Se connecter</button><p class="fine">Pour obtenir un accès, contactez le pilotage.</p></form>
 </section>
-
-<script>
-const SUPABASE_URL='https://ferxlbwivyyfhnwgmcja.supabase.co';
-const SUPABASE_KEY='sb_publishable_8hUQ_GkKsTl09DTe4bLH-Q_ZHEPHRXE';
-const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-const $=id=>document.getElementById(id);
-let state={activeBreaks:[],queue:[],settings:{maxBreaks:7,breakMinutes:15,offerSeconds:60}};
-let name=localStorage.getItem('pause_name')||'',admin=false,offset=0,prev='',warned=false;
-// Jeton propre à ce navigateur : seul lui peut annuler/valider sa pause.
-let token=localStorage.getItem('pause_token');
-if(!token){token=crypto.randomUUID();localStorage.setItem('pause_token',token)}
-$('name').value=name;
-
-// Construction DOM (jamais de HTML concaténé : pas d'injection possible)
-function el(tag,attrs={},...kids){const e=document.createElement(tag);
- for(const k in attrs){if(k==='class')e.className=attrs[k];else if(k.startsWith('data-'))e.setAttribute(k,attrs[k]);else e[k]=attrs[k]}
- e.append(...kids);return e}
-function fill(ul,list,fn,empty){ul.replaceChildren();if(!list.length)ul.append(el('li',{class:'muted'},empty));list.forEach((x,i)=>ul.append(fn(x,i)))}
-const same=x=>x.name.toLowerCase()===name.toLowerCase();
-const nowMs=()=>Date.now()+offset;
-const left=s=>Math.max(0,state.settings.breakMinutes*60000-(nowMs()-Date.parse(s)));
-const offerLeft=s=>Math.max(0,state.settings.offerSeconds*1000-(nowMs()-Date.parse(s)));
-const fmt=ms=>{const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
-function norm(x){const s=x?.settings||{};return{activeBreaks:x?.activeBreaks||[],queue:x?.queue||[],
- settings:{maxBreaks:+(s.maxBreaks||7),breakMinutes:+(s.breakMinutes||15),offerSeconds:+(s.offerSeconds||60)}}}
-function applyState(x){if(x?.serverNow)offset=Date.parse(x.serverNow)-Date.now();state=norm(x);tick()}
-
-function alertMe(msg){
- try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator();o.connect(c.destination);o.frequency.value=880;o.start();o.stop(c.currentTime+.4)}catch(e){}
- try{if(window.Notification&&Notification.permission==='granted')new Notification('Pause conseillers',{body:msg})}catch(e){}
- document.title='🔔 '+msg;setTimeout(()=>document.title='Pause conseillers',8000);$('alert').textContent=msg}
-function notify(){
- const b=state.activeBreaks.find(same),q=state.queue.find(same),s=b?'break':q&&q.offeredAt?'offer':q?'queue':'none';
- if(s==='offer'&&prev!=='offer')alertMe('Une place de pause est libre pour vous : validez !');
- if(prev==='break'&&s==='none')alertMe('Votre pause est terminée.');
- if(b&&left(b.startTime)<=120000&&!warned){warned=true;alertMe('Il reste moins de 2 minutes de pause.')}
- if(!b)warned=false;
- if(s!=='offer'&&s!=='break'&&s!==prev)$('alert').textContent='';
- prev=s}
-
-function render(){
- const S=state.settings,b=state.activeBreaks.find(same),q=state.queue.find(same),o=q&&q.offeredAt;
- $('count').textContent=state.activeBreaks.length;
- $('subtitle').textContent=S.maxBreaks+' places simultanées · '+S.breakMinutes+' min';
- fill($('breaks'),state.activeBreaks,x=>{const l=left(x.startTime);return el('li',{},el('b',{},x.name),el('span',{class:l<180000?'late':''},fmt(l)))},'Personne en pause.');
- fill($('queue'),state.queue,(x,i)=>el('li',{},el('span',{},el('b',{},(i+1)+'. '),x.name),
-  x.offeredAt?el('span',{class:'success'},'place proposée · '+fmt(offerLeft(x.offeredAt))):''),'Aucune demande.');
- $('action').disabled=!name;
- $('action').textContent=b?'Je suis de retour':o?'Je pars en pause':q?'Annuler ma demande':'Demander une pause';
- $('decline').style.display=o?'':'none';
- $('status').textContent=b?'Vous êtes en pause · '+fmt(left(b.startTime))+' restantes':
-  o?'Une place est libre pour vous, validez avant '+fmt(offerLeft(q.offeredAt)):
-  q?'Vous êtes dans la file (position '+(state.queue.indexOf(q)+1)+').':''}
-function tick(){render();notify()}
-
-async function call(fn){
- try{$('error').textContent='';
-  if(window.Notification&&Notification.permission==='default')Notification.requestPermission();
-  const r=await db.rpc(fn,{p_name:name,p_token:token});if(r.error)throw r.error;applyState(r.data)
- }catch(e){$('error').textContent=e.message||String(e)}}
-$('name').oninput=()=>{name=$('name').value.trim().replace(/\s+/g,' ');localStorage.setItem('pause_name',name);tick()};
-$('action').onclick=()=>{const b=state.activeBreaks.find(same),q=state.queue.find(same);
- call(b?'cancel_or_return':q&&q.offeredAt?'accept_offer':q?'cancel_or_return':'request_pause')};
-$('decline').onclick=()=>call('cancel_or_return');
-
-async function refresh(){
- try{const r=await db.rpc('get_pause_state');if(r.error)throw r.error;applyState(r.data);
-  $('connection').textContent='Connecté · '+new Date().toLocaleTimeString('fr-FR');$('connection').className='muted';
-  if(admin)adminRefresh()
- }catch(e){$('connection').textContent='Connexion perdue : données peut-être périmées ('+(e?.message||e)+')';$('connection').className='error'}}
-
-// Administration
-function showAdmin(on){admin=on;$('loginCard').style.display=on?'none':'block';$('dashboard').style.display=on?'block':'none';if(on)adminRefresh()}
-$('openAdmin').onclick=()=>{$('admin').style.display='block';$('admin').scrollIntoView({behavior:'smooth'})};
-$('closeAdmin').onclick=()=>{$('admin').style.display='none'};
-$('login').onclick=async()=>{try{
- const r=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(r.error)throw r.error;
- const a=await db.rpc('is_admin');if(a.error)throw a.error;
- if(!a.data){await db.auth.signOut();throw Error('Ce compte n’est pas administrateur.')}
- $('loginStatus').textContent='';showAdmin(true)
-}catch(e){$('loginStatus').textContent=e.message}};
-$('logout').onclick=async()=>{await db.auth.signOut();showAdmin(false)};
-async function admCall(fn,args={}){const r=await db.rpc(fn,args);
- if(r.error){$('settingsStatus').textContent=r.error.message;$('settingsStatus').className='error';return false}
- $('settingsStatus').textContent='';applyState(r.data);adminRefresh();return true}
-async function adminRefresh(){
- const r=await db.rpc('admin_get_state');
- if(r.error){$('settingsStatus').textContent=r.error.message;$('settingsStatus').className='error';return}
- const s=norm(r.data);
- if(document.activeElement!==$('max'))$('max').value=s.settings.maxBreaks;
- if(document.activeElement!==$('minutes'))$('minutes').value=s.settings.breakMinutes;
- const row=(x,mode,label)=>el('li',{},el('b',{},x.name),el('button',{class:'secondary','data-rm':mode,'data-name':x.name},label));
- fill($('adminBreaks'),s.activeBreaks,x=>row(x,'break','Retour'),'Personne en pause.');
- fill($('adminQueue'),s.queue,x=>row(x,'queue','Retirer'),'Aucune demande.')}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-rm]');
- if(b&&confirm('Confirmer pour '+b.dataset.name+' ?'))admCall('admin_remove_person',{p_name:b.dataset.name,p_mode:b.dataset.rm})});
-$('save').onclick=async()=>{if(await admCall('admin_update_settings',{p_max_breaks:+$('max').value,p_break_minutes:+$('minutes').value})){
- $('settingsStatus').textContent='Paramètres enregistrés.';$('settingsStatus').className='success'}};
-$('clearQueue').onclick=()=>{if(confirm('Vider la file ?'))admCall('admin_clear_queue')};
-$('reset').onclick=()=>{if(confirm('Réinitialiser toutes les pauses et demandes ?'))admCall('admin_reset_all')};
-
-(async()=>{
- await refresh();setInterval(refresh,10000);setInterval(tick,1000);
- document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
- try{const s=await db.auth.getSession();if(s.data.session){const a=await db.rpc('is_admin');if(a.data){$('admin').style.display='block';showAdmin(true)}}}catch(e){}
-})();
-</script>
-</body>
-</html>
+<section id="app" hidden>
+ <div class="page-heading"><div><span class="eyebrow" id="teamLabel"></span><h1>Mes pauses</h1></div><div class="connection"><span id="connection" role="status">Actualisation…</span><button id="refresh" class="quiet">Actualiser</button></div></div>
+ <nav aria-label="Vues" id="tabs"><button id="personalTab" aria-pressed="true">Mon espace</button><button id="adminTab" aria-pressed="false" hidden>Pilotage</button></nav>
+ <div id="personalView">
+  <section class="hero card" aria-labelledby="personalTitle"><div><span class="eyebrow">MON STATUT</span><h2 id="personalTitle">Prêt pour une pause ?</h2><p id="personalDescription"></p><p id="personalAlert" role="alert"></p></div><div class="hero-action"><div id="timer" class="timer" aria-label="Temps restant"></div><button id="action" class="primary">Demander une pause</button><button id="cancel" class="quiet" hidden>Passer mon tour</button></div></section>
+  <div class="notification-controls"><button id="notifications" class="quiet">Activer et tester les notifications</button><label class="inline"><input id="sound" type="checkbox"> Son des alertes</label><span id="notificationStatus" class="fine"></span></div>
+ </div>
+ <div id="adminToolbar" class="card compact" hidden><label for="teamSelect">Équipe suivie</label><select id="teamSelect"></select><button id="newTeam" class="quiet">Nouvelle équipe</button></div>
+ <div class="stats" aria-label="Occupation"><div><span>Places libres</span><strong id="freeCount">—</strong></div><div><span>En pause</span><strong id="activeCount">—</strong></div><div><span>Places proposées</span><strong id="offeredCount">—</strong></div><div><span>En attente</span><strong id="waitingCount">—</strong></div></div>
+ <p id="scheduleInfo" class="notice muted"></p>
+ <div class="columns"><section class="card"><div class="section-heading"><h2>En pause</h2><span class="pill">Retour confirmé</span></div><ul id="breaks"></ul></section><section class="card"><div class="section-heading"><h2>File d’attente</h2><span class="pill">Ordre d’arrivée</span></div><ul id="queue"></ul></section></div>
+ <section id="adminView" hidden>
+ <form id="settingsForm" class="card"><div class="section-heading"><div><span class="eyebrow">RÈGLES DE L’ÉQUIPE</span><h2>Paramètres de départ</h2></div><span id="dirtyLabel" class="pill" hidden>Modifications non enregistrées</span></div><div class="form-grid">
+ <label>Nom de l’équipe<input name="name" required maxlength="60"></label><label>Places simultanées<input name="max_breaks" type="number" min="1" max="100" required></label><label>Durée de pause (minutes)<input name="break_minutes" type="number" min="1" max="180" required></label><label>Délai pour accepter (secondes)<input name="offer_seconds" type="number" min="20" max="600" required></label><label>Début des départs<input name="opens" type="time" required></label><label>Fin des départs<input name="closes" type="time" required></label>
+ </div><fieldset id="weekdays"><legend>Jours autorisés · heure de Paris</legend><label><input type="checkbox" value="1"> Lun</label><label><input type="checkbox" value="2"> Mar</label><label><input type="checkbox" value="3"> Mer</label><label><input type="checkbox" value="4"> Jeu</label><label><input type="checkbox" value="5"> Ven</label><label><input type="checkbox" value="6"> Sam</label><label><input type="checkbox" value="7"> Dim</label></fieldset><label class="inline"><input name="suspended" type="checkbox"> Suspendre les nouveaux départs</label><p class="fine">Une modification de durée s’applique aux prochains départs. Les pauses en cours conservent leur heure de fin prévue.</p><div class="row"><button class="primary">Enregistrer</button><button id="discardSettings" type="button" class="quiet">Recharger les paramètres</button></div></form>
+ <section class="card"><div class="section-heading"><h2>Conseillers et accès</h2><button id="loadMembers" class="quiet">Actualiser les comptes</button></div><p class="fine">Créez d’abord le compte dans Supabase Authentication, puis autorisez-le ici. Les rôles sont contrôlés côté serveur.</p><form id="memberForm" class="form-grid"><label>E-mail<input name="email" type="email" required></label><label>Nom affiché<input name="display_name" required maxlength="60"></label><label>Équipe<select name="team_id" id="memberTeam"></select></label><label>Rôle<select name="role"><option value="advisor">Conseiller</option><option value="admin">Pilotage</option></select></label><label class="inline"><input name="enabled" type="checkbox" checked> Compte autorisé</label><button class="primary">Enregistrer le compte</button></form><ul id="members"></ul></section>
+ <section class="card"><div class="section-heading"><div><span class="eyebrow">SUIVI DU PILOTAGE</span><h2>Historique et indicateurs</h2></div><div class="row"><label for="historyDays">Période</label><select id="historyDays"><option value="1">24 heures</option><option value="7" selected>7 jours</option><option value="30">30 jours</option><option value="90">90 jours</option></select><button id="loadHistory" class="quiet">Charger</button><button id="exportCsv" class="quiet" disabled>Exporter CSV Excel</button></div></div><p class="fine">Conservation : 90 jours. Les indicateurs portent sur les lignes chargées, au maximum 5 000. Les retours du pilotage sont identifiés.</p><div id="historyMetrics" class="stats"></div><p id="historyInfo" role="status"></p><div class="table-scroll"><table><thead><tr><th>Conseiller</th><th>Demande</th><th>Départ</th><th>Retour</th><th>État</th></tr></thead><tbody id="historyRows"></tbody></table></div><details><summary>Dernières actions du pilotage</summary><ul id="audit"></ul></details></section>
+ <section class="card danger-zone"><h2>Actions collectives</h2><p>Ces actions concernent uniquement l’équipe affichée. L’historique est conservé.</p><div class="row"><button id="clearQueue" class="danger">Vider la file</button><button id="resetTeam" class="danger">Clôturer toutes les pauses et demandes</button></div></section>
+ </section>
+</section>
+</main><footer class="shell">Break App · Version 2 <span>Les compteurs n’attestent pas d’un retour au poste.</span></footer>
+</body></html>
