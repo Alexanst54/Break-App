@@ -3,10 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { config,validateConfig } from './config.js';
 import { duration,labels,csv,metrics,serialQueue } from './utils.js';
 const $=id=>document.getElementById(id), settings=$('settingsForm'),memberForm=$('memberForm');
-let db,state=null,session=null,team=null,adminView=false,dirty=false,settingsRevision=null,busy=false,offset=0,failures=0,lastSuccess=0,pollTimer=null,refreshPending=false,authEpoch=0,history=[],audio=null,prior=null,warned=null,newTeam=false,stateVersion=null,probeSupported=true;
+let db,state=null,session=null,team=null,passwordSetup=false,authLinkType=new URLSearchParams(window.location.hash.slice(1)).get('type'),adminView=false,dirty=false,settingsRevision=null,busy=false,offset=0,failures=0,lastSuccess=0,pollTimer=null,refreshPending=false,authEpoch=0,history=[],audio=null,prior=null,warned=null,newTeam=false,stateVersion=null,probeSupported=true;
 const enqueue=serialQueue();
 const el=(tag,text='',className='')=>{const node=document.createElement(tag);node.textContent=text;if(className)node.className=className;return node;};
 function report(text,isError=false){const target=$(isError?'error':'message');target.textContent=text;target.hidden=!text;if(!isError)$('error').hidden=true;}
+function clearAuthFragment(){history.replaceState(null,'',window.location.pathname+window.location.search);authLinkType=null;}
+function showPasswordSetup(){$('boot').hidden=true;$('app').hidden=true;$('auth').hidden=false;$('identity').hidden=true;$('loginForm').hidden=true;$('resetForm').hidden=true;$('passwordSetupForm').hidden=false;$('newPassword').focus();}
+function showLogin(){$('passwordSetupForm').hidden=true;$('loginForm').hidden=false;}
 function describeError(e){if(e?.message?.includes('Invalid login credentials'))return 'Adresse e-mail ou mot de passe incorrect.';if(e?.message?.includes('Failed to fetch')||e?.name==='AbortError')return 'Connexion indisponible. Réessayez dans quelques instants.';return e?.message||String(e);}
 function buttons(){document.querySelectorAll('button').forEach(b=>{b.disabled=busy;});$('exportCsv').disabled=busy||!history.length;if(state){const mine=state.myLatest,open=['waiting','offered','active'].includes(mine?.status);$('action').disabled=busy||!lastSuccess||(!open&&!state.open)||Date.now()-lastSuccess>120000;}}
 async function run(fn){if(busy)return;busy=true;buttons();report('');try{await fn();}catch(e){report(describeError(e),true);}finally{busy=false;buttons();}}
@@ -42,6 +45,10 @@ function tick(){if(!state)return;const now=Date.now()+offset;document.querySelec
 function notify(text){$('personalAlert').textContent=text;document.title='🔔 '+text;setTimeout(()=>document.title='Break App · Préproduction',8000);if($('sound').checked&&audio){const oscillator=audio.createOscillator(),gain=audio.createGain();gain.gain.value=.08;oscillator.connect(gain).connect(audio.destination);oscillator.frequency.value=880;oscillator.start();oscillator.stop(audio.currentTime+.3);}try{if(Notification.permission==='granted')new Notification('Break App · Préproduction',{body:text});}catch{} }
 $('notifications').onclick=()=>run(async()=>{if(!('Notification'in window)){report('Ce navigateur ne propose pas les notifications. Les alertes visuelles restent actives.');return;}const permission=await Notification.requestPermission();$('notificationStatus').textContent=permission==='granted'?'Notifications autorisées':permission==='denied'?'Notifications bloquées dans le navigateur':'Autorisation non accordée';const Audio=window.AudioContext||window.webkitAudioContext;if(Audio){audio??=new Audio();await audio.resume();}notify('Test des alertes : vous êtes prêt.');});
 try{$('sound').checked=localStorage.getItem('break-preprod-sound')==='true';}catch{}
+$('showReset').onclick=()=>{$('loginForm').hidden=true;$('resetForm').hidden=false;$('resetEmail').value=$('email').value.trim();$('resetEmail').focus();};
+$('backToLogin').onclick=()=>{$('resetForm').hidden=true;$('loginForm').hidden=false;};
+$('resetForm').onsubmit=e=>{e.preventDefault();run(async()=>{const email=$('resetEmail').value.trim();const redirectTo=new URL(window.location.pathname,window.location.origin).href;const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo});if(error)throw error;$('resetForm').hidden=true;$('loginForm').hidden=false;report('Si cette adresse possède un compte, un lien de réinitialisation va lui être envoyé.');});};
+$('passwordSetupForm').onsubmit=e=>{e.preventDefault();run(async()=>{const password=$('newPassword').value;if(password.length<8)throw Error('Choisissez un mot de passe d’au moins 8 caractères.');if(password!==$('confirmPassword').value)throw Error('Les deux mots de passe ne correspondent pas.');const {error}=await db.auth.updateUser({password});$('newPassword').value='';$('confirmPassword').value='';if(error)throw error;clearAuthFragment();$('passwordSetupForm').hidden=true;showLogin();await refresh(true);report('Mot de passe enregistré. Vous pouvez maintenant vous connecter.');});};
 $('sound').onchange=async()=>{try{localStorage.setItem('break-preprod-sound',String($('sound').checked));const Audio=window.AudioContext||window.webkitAudioContext;if($('sound').checked&&Audio){audio??=new Audio();await audio.resume();}}catch{}};
 $('action').onclick=()=>run(async()=>{const r=state.myLatest;const action=r?.status==='active'?'return':r?.status==='offered'?'accept':r?.status==='waiting'?'cancel':'request';apply(await rpc('ba_act',{p_action:action,p_request_id:action==='request'?null:r.id}));});
 $('cancel').onclick=()=>run(async()=>apply(await rpc('ba_act',{p_action:'cancel',p_request_id:state.myLatest.id})));
@@ -73,8 +80,8 @@ window.addEventListener('online',()=>refresh());
 window.addEventListener('offline',()=>{$('connection').textContent='Hors connexion · données anciennes';});
 try{
  validateConfig();
- db=createClient(config.url,config.publishableKey,{auth:{storageKey:'break-app-preprod-auth',persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
- db.auth.onAuthStateChange((_event,next)=>{setTimeout(()=>{if(session?.access_token!==next?.access_token)adoptSession(next).catch(e=>report(describeError(e),true));},0);});
- const {data,error}=await db.auth.getSession();if(error)throw error;await adoptSession(data.session);
+ db=createClient(config.url,config.publishableKey,{auth:{storageKey:'break-app-preprod-auth',persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+ db.auth.onAuthStateChange((event,next)=>{setTimeout(()=>{if(event==='PASSWORD_RECOVERY'||(event==='SIGNED_IN'&&(authLinkType==='invite'||authLinkType==='recovery')))showPasswordSetup();if(session?.access_token!==next?.access_token)adoptSession(next).catch(e=>report(describeError(e),true));},0);});
+ const {data,error}=await db.auth.getSession();if(error)throw error;if(data.session&&(authLinkType==='invite'||authLinkType==='recovery'))showPasswordSetup();await adoptSession(data.session);
  setInterval(tick,1000);
 }catch(e){$('boot').hidden=true;report(describeError(e),true);}
